@@ -27,10 +27,12 @@ st.markdown("""
 st.title("⛈️ Dashboard Cuaca Indonesia (Real-Time)")
 st.markdown("Monitor peluang hujan (%) per jam di berbagai kota besar Indonesia.")
 
-# --- 2. FUNGSI LOAD DATA ---
-@st.cache_data
+# --- 2. FUNGSI LOAD DATA (DENGAN AUTO UPDATE) ---
+# ttl=300 artinya data akan disimpan di cache selama 300 detik (5 menit).
+# Setelah 5 menit, jika user refresh, Streamlit akan membaca ulang file Excel terbaru.
+@st.cache_data(ttl=300)
 def load_data():
-    # Pastikan file ini ada di folder yang sama
+    # Pastikan nama file sesuai dengan yang ada di GitHub/Folder kamu
     file_path = "Data_Cuaca.xlsx"
     
     if not os.path.exists(file_path):
@@ -69,7 +71,7 @@ df = load_data()
 # --- CEK DATA ---
 if df is None or df.empty:
     st.error("⚠️ Data tidak ditemukan atau kosong.")
-    st.info("Pastikan file 'Data_Cuaca_Hourly_Percent.xlsx' ada di folder yang sama.")
+    st.info("Pastikan file 'Data_Cuaca.xlsx' ada di repository GitHub kamu.")
     st.stop()
 
 # --- 3. SIDEBAR FILTER ---
@@ -77,7 +79,6 @@ st.sidebar.header("🔍 Filter Data")
 
 # Filter Kota
 kota_list = sorted(df['Kota'].unique().tolist())
-# Default pilih semua kota agar peta langsung terlihat se-Indonesia
 selected_kota = st.sidebar.multiselect("Pilih Kota:", kota_list, default=kota_list)
 
 # Filter Tanggal
@@ -89,6 +90,7 @@ selected_tanggal = st.sidebar.selectbox("Pilih Tanggal:", options=tanggal_list)
 
 # --- 4. FILTER DATAFRAME ---
 if not selected_kota:
+    # Jika tidak ada kota dipilih, tampilkan semua (opsional, atau bisa stop)
     filtered_df = df[df['Tanggal'].astype(str) == selected_tanggal]
 else:
     filtered_df = df[
@@ -102,10 +104,16 @@ if filtered_df.empty:
 
 # --- 5. LOGIKA AUTO ZOOM PETA ---
 # Hitung titik tengah dari kota yang dipilih
-lat_center = filtered_df['Latitude'].mean()
-lon_center = filtered_df['Longitude'].mean()
+if not filtered_df.empty:
+    lat_center = filtered_df['Latitude'].mean()
+    lon_center = filtered_df['Longitude'].mean()
+else:
+    # Default Center Indonesia jika data kosong
+    lat_center = -2.5489
+    lon_center = 118.0149
 
 # Atur level zoom: Jika kota sedikit zoom dekat, jika banyak zoom jauh
+# Logic: Semakin sedikit kota, semakin besar zoom level-nya
 zoom_level = 6 if len(selected_kota) <= 3 else 4
 
 # --- 6. DASHBOARD UTAMA ---
@@ -133,32 +141,25 @@ col_left, col_right = st.columns([2, 1])
 with col_left:
     st.subheader("📈 Tren Peluang Hujan per Jam")
     
-    # GRAFIK GARIS (LINE CHART) - LEBIH JELAS
     fig_line = px.line(
         filtered_df, 
         x="Jam", 
         y="Peluang_Angka", 
         color="Kota",
-        markers=True,  # Menampilkan titik data
+        markers=True, 
         title="Persentase Peluang (%)",
         labels={"Peluang_Angka": "Peluang (%)"},
         template="plotly_dark",
         range_y=[0, 105]
     )
     
-    # Kustomisasi Garis & Titik
-    fig_line.update_traces(
-        line=dict(width=3), 
-        marker=dict(size=8)
-    )
+    fig_line.update_traces(line=dict(width=3), marker=dict(size=8))
     
-    # Garis Batas Waspada
     fig_line.add_hline(
         y=50, line_dash="dot", line_color="#FF4B4B", 
         annotation_text="Batas Waspada (50%)", annotation_position="top right"
     )
     
-    # Pindahkan Legenda ke Bawah agar grafik luas
     fig_line.update_layout(
         legend=dict(
             orientation="h",
@@ -174,7 +175,7 @@ with col_left:
 
 with col_right:
     st.subheader("🍰 Porsi Risiko Cuaca")
-    # Hitung jumlah jam berdasarkan kategori risiko
+    
     pie_data = filtered_df['Kategori_Risk'].value_counts().reset_index()
     pie_data.columns = ['Kategori', 'Jumlah']
     
@@ -188,14 +189,14 @@ with col_right:
             "🟡 Hujan (>50%)": "#xFFA15A",
             "🔴 Badai (>80%)": "#EF553B"
         },
-        hole=0.4 # Donut Chart
+        hole=0.4
     )
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # C. PETA SEBARAN (AUTO ZOOM)
 st.subheader("🗺️ Peta Sebaran Lokasi")
 
-# Ambil 1 data per kota untuk peta
+# Ambil 1 data per kota untuk peta agar tidak menumpuk
 map_df = filtered_df.drop_duplicates(subset=['Kota'])
 
 fig_map = px.scatter_mapbox(
@@ -205,11 +206,11 @@ fig_map = px.scatter_mapbox(
     hover_name="Kota",
     hover_data=["Deskripsi", "Peluang_Hujan"],
     color="Peluang_Angka",
-    color_continuous_scale="RdYlGn_r", # Hijau aman, Merah bahaya
-    size="Peluang_Angka",  # Ukuran titik sesuai peluang hujan
-    size_max=35,           # Maksimum ukuran titik diperbesar agar terlihat
-    zoom=zoom_level,       # Zoom otomatis
-    center={"lat": lat_center, "lon": lon_center}, # Pusatkan peta
+    color_continuous_scale="RdYlGn_r", 
+    size="Peluang_Angka", 
+    size_max=35, 
+    zoom=zoom_level, 
+    center={"lat": lat_center, "lon": lon_center}, # Auto Center
     mapbox_style="open-street-map",
     height=500
 )
