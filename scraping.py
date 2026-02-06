@@ -68,7 +68,7 @@ locations_list = [
 locations = {name: {"slug": slug, "lat": lat, "lon": lon} for name, slug, lat, lon in locations_list}
 all_data = []
 
-print(f"🤖 MENYIAPKAN SELENIUM (KHUSUS PERSENTASE %)...")
+print(f" MENYIAPKAN SELENIUM (KHUSUS PERSENTASE %)...")
 
 chrome_options = Options()
 # Set bahasa Inggris agar format angka standar
@@ -85,7 +85,7 @@ chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 driver.set_page_load_timeout(30)
 
-print("🚀 MEMULAI SCRAPING...")
+print(" MEMULAI SCRAPING...")
 
 try:
     wait = WebDriverWait(driver, 10) 
@@ -100,7 +100,7 @@ try:
             try:
                 wait.until(EC.presence_of_element_located((By.ID, "wt-hbh")))
             except:
-                print("❌ Lewati (Timeout)")
+                print(" Lewati (Timeout)")
                 continue
 
             soup = BeautifulSoup(driver.page_source, 'html.parser')
@@ -112,43 +112,72 @@ try:
                 current_date_str = datetime.now().strftime("%Y-%m-%d")
 
                 for row in rows:
+                    # =========================================================
                     # 1. HEADER TANGGAL
+                    # =========================================================
                     header_col = row.find('th', colspan=True)
                     if header_col:
                         try:
                             date_text = header_col.get_text(strip=True)
                             if "," in date_text:
+                                # Ambbil bagian setelah koma
                                 date_part = date_text.split(",")[1].strip()
-                                dt_temp = datetime.strptime(date_part + f" {datetime.now().year}", "%d %B %Y")
-                                current_date_str = dt_temp.strftime("%Y-%m-%d")
-                        except: pass
+                                
+                                # Pecah angka dan nama bulan
+                                parts = date_part.split()
+                                if len(parts) >= 2:
+                                    day_num = int(parts[0])
+                                    month_str = parts[1]
+
+                                    # Mapping bulan secara manual
+                                    months_map = {
+                                        "January": 1, "February": 2, "March": 3, "April": 4, 
+                                        "May": 5, "June": 6, "July": 7, "August": 8, 
+                                        "September": 9, "October": 10, "November": 11, "December": 12
+                                    }
+
+                                    month_num = months_map.get(month_str)
+
+                                    if month_num:
+                                        now = datetime.now()
+                                        year = now.year
+                                        # Cek jika bulan sudah beganti tahun
+                                        if now.month == 12 and month_num == 1:
+                                            year += 1
+                                        
+                                        # Update tanggal saat ini
+                                        dt_temp = datetime(year, month_num, day_num)
+                                        current_date_str = dt_temp.strftime("%Y-%m-%d")
+                        except: 
+                            pass 
                         continue
+                    
+                    # =========================================================
 
                     # 2. DATA JAM
                     cols = row.find_all('td')
                     if len(cols) > 8: 
                         th = row.find('th')
                         if not th: continue
-                        clean_time = th.get_text(strip=True)[:5] # Ambil HH:MM
+                        clean_time = th.get_text(strip=True)[:5] 
                         
                         deskripsi = cols[0].get_text(strip=True) 
                         if not deskripsi: 
                             img = cols[0].find('img')
                             if img: deskripsi = img.get('title', 'N/A')
                         
-                        # --- FOKUS: AMBIL PERSENTASE (%) ---
-                        peluang_hujan = "0%" # Default
+                        # --- FOKUS: MENGAMBIL PERSENTASE (%) ---
+                        peluang_hujan = "0%"
                         
                         for col in cols:
                             txt = col.get_text(strip=True)
                             
-                            # Cari angka yang diikuti tanda %
-                            # Contoh teks di web: "24%" atau "24% 0.5mm"
+                            # Mencari angka yang diikuti tanda %
                             if "%" in txt:
                                 match_pct = re.search(r"(\d+)%", txt)
                                 if match_pct:
                                     peluang_hujan = f"{match_pct.group(1)}%"
-                                    break # Ketemu, langsung keluar loop
+                                    break 
 
                         all_data.append({
                             "Kota": city_name, 
@@ -157,16 +186,16 @@ try:
                             "Tanggal": current_date_str,
                             "Jam": clean_time,
                             "Deskripsi": deskripsi, 
-                            "Peluang_Hujan": peluang_hujan # HANYA PERSEN
+                            "Peluang_Hujan": peluang_hujan 
                         })
                         data_count += 1
                 
-                print(f"✅ OK ({data_count} jam data)")
+                print(f" OK ({data_count} jam data)")
             else:
-                print("⚠️ Gagal Baca Tabel")
+                print(" Gagal Baca Tabel")
         
         except Exception as e:
-            print(f"❌ Error: {e}")
+            print(f" Error: {e}")
             continue
 
 finally:
@@ -177,6 +206,7 @@ finally:
 print("\n" + "="*40)
 df = pd.DataFrame(all_data)
 filename = "Data_Cuaca.xlsx"
+
 
 if not df.empty:
     df.to_excel(filename, index=False, engine='openpyxl')
@@ -193,7 +223,7 @@ if not df.empty:
         ws.column_dimensions[get_column_letter(column_cells[0].column)].width = length + 2
 
     wb.save(filename)
-    print(f"✅ FILE SELESAI: {filename}")
-    print(f"🎉 Total Data Valid (Persentase Only): {len(df)} Baris")
+    print(f" FILE SELESAI: {filename}")
+    print(f" Total Data Valid (Persentase Only): {len(df)} Baris")
 else:
-    print("❌ Gagal mendapatkan data.")
+    print(" Gagal mendapatkan data.")

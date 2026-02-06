@@ -32,7 +32,6 @@ st.markdown("Monitor peluang hujan (%) per jam di berbagai kota besar Indonesia.
 # Setelah 5 menit, jika user refresh, Streamlit akan membaca ulang file Excel terbaru.
 @st.cache_data(ttl=300)
 def load_data():
-    # Pastikan nama file sesuai dengan yang ada di GitHub/Folder kamu
     file_path = "Data_Cuaca.xlsx"
     
     if not os.path.exists(file_path):
@@ -90,7 +89,7 @@ selected_tanggal = st.sidebar.selectbox("Pilih Tanggal:", options=tanggal_list)
 
 # --- 4. FILTER DATAFRAME ---
 if not selected_kota:
-    # Jika tidak ada kota dipilih, tampilkan semua (opsional, atau bisa stop)
+    # Jika tidak ada kota dipilih, tampilkan semua
     filtered_df = df[df['Tanggal'].astype(str) == selected_tanggal]
 else:
     filtered_df = df[
@@ -103,7 +102,6 @@ if filtered_df.empty:
     st.stop()
 
 # --- 5. LOGIKA AUTO ZOOM PETA ---
-# Hitung titik tengah dari kota yang dipilih
 if not filtered_df.empty:
     lat_center = filtered_df['Latitude'].mean()
     lon_center = filtered_df['Longitude'].mean()
@@ -112,8 +110,7 @@ else:
     lat_center = -2.5489
     lon_center = 118.0149
 
-# Atur level zoom: Jika kota sedikit zoom dekat, jika banyak zoom jauh
-# Logic: Semakin sedikit kota, semakin besar zoom level-nya
+# Atur level zoom peta
 zoom_level = 6 if len(selected_kota) <= 3 else 4
 
 # --- 6. DASHBOARD UTAMA ---
@@ -210,7 +207,7 @@ fig_map = px.scatter_mapbox(
     size="Peluang_Angka", 
     size_max=35, 
     zoom=zoom_level, 
-    center={"lat": lat_center, "lon": lon_center}, # Auto Center
+    center={"lat": lat_center, "lon": lon_center},
     mapbox_style="open-street-map",
     height=500
 )
